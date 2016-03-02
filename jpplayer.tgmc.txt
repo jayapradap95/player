@@ -1,0 +1,309 @@
+Public Class Player
+    Private PlayAgain As Boolean
+
+    Private Sub Library_FormClosing(ByVal sender As Object, ByVal e As System.Windows.Forms.FormClosingEventArgs) Handles Me.FormClosing
+        Dim CloseMessage As DialogResult
+        CloseMessage = MsgBox("Are you sure you want to close?", MsgBoxStyle.YesNo)
+        If CloseMessage = Windows.Forms.DialogResult.Yes Then
+            track.Ctlcontrols.stop()
+        End If
+        If CloseMessage = Windows.Forms.DialogResult.No Then
+            e.Cancel = True
+        End If
+    End Sub
+
+    Private Sub Library_Load(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles MyBase.Load
+        track.settings.autoStart = True
+        track.settings.volume = VolumeBar.Value
+        'track.settings.balance = BalanceBar.Value
+        track.settings.enableErrorDialogs = False
+        track.enableContextMenu = True
+        BalanceBar.Visible = False
+        p_next.Enabled = False
+        p_prev.Enabled = False
+        If SplitContainer2.Panel2Collapsed = False Then
+            SplitContainer2.Panel2Collapsed = True
+        Else
+            SplitContainer2.Panel2Collapsed = False
+        End If
+        playscreen()
+
+
+        If My.Settings.PlayAgain = False Then
+            continuePlay.Checked = False
+            PlayAgain = False
+        Else
+            continuePlay.Checked = True
+            PlayAgain = True
+        End If
+
+
+    End Sub
+    Private Sub GetFile()
+        OpenFile.Multiselect = True
+
+        If OpenFile.ShowDialog = Windows.Forms.DialogResult.OK And OpenFile.FileName <> "" Then
+            track.URL = OpenFile.FileName
+            DurationTimer.Enabled = True
+        ElseIf track.URL = ".jpg" Then
+            DurationTimer.Enabled = False
+        End If
+
+    End Sub
+    Private Sub PlaySong()
+        If track.URL <> "" Then
+            track.Ctlcontrols.play()
+            DurationTimer.Enabled = True
+        Else
+            DurationTimer.Enabled = False
+        End If
+    End Sub
+    Private Sub StopSong()
+        track.Ctlcontrols.stop()
+        Duration.Text = "00:00"
+        DurationTimer.Enabled = False
+        PlayBar.Value = 0
+    End Sub
+
+    Private Sub OpenBtn_Click(ByVal sender As System.Object, ByVal e As System.EventArgs)
+        GetFile()
+    End Sub
+      Private Sub PlayBar_Scroll(ByVal sender As System.Object, ByVal e As System.Windows.Forms.ScrollEventArgs) Handles PlayBar.Scroll
+        Try
+            If (track.currentMedia.duration <> 0) Then
+                Dim NewPerc As Double = Convert.ToDouble(PlayBar.Value) / 100
+                Dim DurationVar As Integer = Convert.ToInt32(track.currentMedia.duration * 1000) ' milliseconds
+                Dim NewPos As Integer = (DurationVar * NewPerc) / 1000
+
+
+                track.Ctlcontrols.currentPosition = NewPos
+            Else
+                PlayBar.Value = 0
+            End If
+        Catch ex As Exception
+            MsgBox(ex.Message)
+        End Try
+    End Sub
+
+    Private Sub DurationTimer_Tick(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles DurationTimer.Tick
+        ' Update the trackbar.
+        Dim CurPos As Integer = Convert.ToInt32(track.Ctlcontrols.currentPosition * 1000) ' milliseconds
+        Dim DurationVar As Integer = Convert.ToInt32(track.currentMedia.duration * 1000) ' milliseconds
+        If DurationVar > 0 Then
+            PlayBar.Value = Convert.ToInt32((CurPos * 100) / DurationVar) ' % complete
+        End If
+
+        ' Update the time label
+        Duration.Text = track.Ctlcontrols.currentPositionString
+
+        If track.playState = WMPLib.WMPPlayState.wmppsStopped Then
+            Duration.Text = "00:00"
+            DurationTimer.Enabled = False
+            If PlayBar.Value = 0 Then
+
+                p_nextt()
+                DurationTimer.Enabled = True
+                If Duration.Text = "00:00" Then
+                    pause()
+
+                End If
+
+            End If
+
+        End If
+        If PlayAgain = False Then
+        Else
+            If track.playState = WMPLib.WMPPlayState.wmppsStopped Then
+                PlaySong()
+            Else
+            End If
+        End If
+    End Sub
+
+    Private Sub VolumeBar_Scroll(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles VolumeBar.Scroll
+        track.settings.volume = VolumeBar.Value
+    End Sub
+    Private Sub ContinuePlay_Click(ByVal sender As System.Object, ByVal e As System.EventArgs)
+        If continuePlay.Checked = True Then
+            My.Settings.PlayAgain = False
+            continuePlay.Checked = False
+        Else
+            My.Settings.PlayAgain = True
+            continuePlay.Checked = True
+        End If
+    End Sub
+
+    Private Sub p_open_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_open.ClickButtonArea
+        open()
+        'GetFile()
+    End Sub
+    Private Sub open()
+        'file dah luhna
+               OpenFile.Multiselect = True
+        Dim dr As DialogResult = OpenFile.ShowDialog()
+        If dr = Windows.Forms.DialogResult.OK Then
+            For Each track As String In OpenFile.FileNames
+                ListBox1.Items.Add(track)
+                'playListBox.Items.Add(track)
+                playListBox.Items.Add(track.Substring(track.LastIndexOf("\") + 1))
+            Next
+            playListBox.SelectedIndex = 0
+            ListBox1.SelectedIndex = playListBox.SelectedIndex
+            track.URL = ListBox1.SelectedItem.ToString
+            'track.URL = playListBox.SelectedItem.ToString
+            DurationTimer.Enabled = True
+            track.settings.volume = 70
+            PlaySong()
+            p_next.Enabled = True
+            p_prev.Enabled = True
+        End If
+    End Sub
+    Private Sub p_pre()
+        If playListBox.SelectedIndex = 0 Then
+            ListBox1.SelectedIndex = playListBox.SelectedIndex
+        Else
+            ListBox1.SelectedIndex = playListBox.SelectedIndex - 1
+            playListBox.SelectedIndex = ListBox1.SelectedIndex
+        End If
+        track.settings.volume = 70
+        track.URL = ListBox1.SelectedItem.ToString
+        PlaySong()
+    End Sub
+
+    Private Sub p_prev_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_prev.ClickButtonArea
+        p_pre()
+    End Sub
+    Public Sub p_nextt()
+        If playListBox.SelectedIndex = playListBox.Items.Count - 1 Then
+            ListBox1.SelectedIndex = playListBox.SelectedIndex
+        Else
+            ListBox1.SelectedIndex = playListBox.SelectedIndex + 1
+            playListBox.SelectedIndex = ListBox1.SelectedIndex
+        End If
+        track.URL = ListBox1.SelectedItem.ToString
+        track.settings.volume = 70
+        PlaySong()
+    End Sub
+    Private Sub p_next_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_next.ClickButtonArea
+        p_nextt()
+    End Sub
+    Private Sub p_pause_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_pause.ClickButtonArea
+        pause()
+    End Sub
+    Public Sub pause()
+        track.Ctlcontrols.pause()
+    End Sub
+    Private Sub p_ford_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_ford.ClickButtonArea
+        track.Ctlcontrols.fastReverse()
+    End Sub
+    Private Sub p_rewind_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_rewind.ClickButtonArea
+        track.Ctlcontrols.fastForward()
+    End Sub
+    Private Sub p_del_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_del.ClickButtonArea
+        ListBox1.Items.Remove(ListBox1.SelectedIndex)
+        playListBox.Items.Remove(playListBox.SelectedItem)
+        ListBox1.Items.Remove(ListBox1.SelectedItem)
+        p_nextt()
+
+    End Sub
+
+    Private Sub p_clear_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_clear.ClickButtonArea
+        track.Ctlcontrols.stop()
+        playListBox.Items.Clear()
+        ListBox1.Items.Clear()
+    End Sub
+    Private Sub p_playlist_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_playlist.ClickButtonArea
+        playscreen()
+    End Sub
+    Private Sub PlayToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles PlayToolStripMenuItem.Click
+
+        PlaySong()
+    End Sub
+    Private Sub p_play_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_play.ClickButtonArea
+        PlaySong()
+    End Sub
+   Private Sub p_stop_ClickButtonArea(ByVal Sender As System.Object, ByVal e As System.Windows.Forms.MouseEventArgs) Handles p_stop.ClickButtonArea
+        StopSong()
+    End Sub
+    Private Sub PauseToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles PauseToolStripMenuItem.Click
+        pause()
+    End Sub
+    Private Sub StopToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles StopToolStripMenuItem.Click
+        StopSong()
+    End Sub
+    Private Sub RewindToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles RewindToolStripMenuItem.Click
+        track.Ctlcontrols.fastReverse()
+    End Sub
+    Private Sub ForwardToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ForwardToolStripMenuItem.Click
+        track.Ctlcontrols.fastForward()
+    End Sub
+    Private Sub QuitToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles QuitToolStripMenuItem.Click
+        Close()
+    End Sub
+    Private Sub playscreen()
+
+        If SplitContainer1.Panel1Collapsed = False Then
+            SplitContainer1.Panel1Collapsed = True
+        Else
+            SplitContainer1.Panel1Collapsed = False
+        End If
+    End Sub
+    Private Sub ToolStripMenuItem3_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ToolStripMenuItem3.Click
+        playscreen()
+    End Sub
+    Private Sub ToolStripMenuItem4_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ToolStripMenuItem4.Click
+        playscreen()
+    End Sub
+
+    Private Sub playListBox_DoubleClick(ByVal sender As Object, ByVal e As System.EventArgs) Handles playListBox.DoubleClick
+        ListBox1.SelectedIndex = playListBox.SelectedIndex
+        track.URL = ListBox1.SelectedItem.ToString
+        track.settings.volume = 70
+        PlaySong()
+        'track.Ctlcontrols.play()
+    End Sub
+
+    Private Sub OpenToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles OpenToolStripMenuItem.Click
+        open()
+    End Sub
+
+    Private Sub ExitToolStripMenuItem1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ExitToolStripMenuItem1.Click
+        Close()
+    End Sub
+
+    Private Sub PlayToolStripMenuItem1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles PlayToolStripMenuItem1.Click
+        PlaySong()
+    End Sub
+
+    Private Sub PauseToolStripMenuItem1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles PauseToolStripMenuItem1.Click
+        pause()
+    End Sub
+
+    Private Sub StopToolStripMenuItem1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles StopToolStripMenuItem1.Click
+        StopSong()
+    End Sub
+
+    Private Sub ForwardToolStripMenuItem1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ForwardToolStripMenuItem1.Click
+        track.Ctlcontrols.fastForward()
+    End Sub
+
+    Private Sub RewindToolStripMenuItem1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles RewindToolStripMenuItem1.Click
+        track.Ctlcontrols.fastReverse()
+    End Sub
+
+    Private Sub PlayListToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles PlayListToolStripMenuItem.Click
+        playscreen()
+    End Sub
+
+    Private Sub fullscreenMenuItem2_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles fullscreenMenuItem2.Click
+        playscreen()
+    End Sub
+
+    Private Sub NextToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles NextToolStripMenuItem.Click
+        p_nextt()
+    End Sub
+
+    Private Sub PreviousToolStripMenuItem_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles PreviousToolStripMenuItem.Click
+        p_pre()
+    End Sub
+End Class
